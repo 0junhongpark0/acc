@@ -1,0 +1,2773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>샤나메: 로스탐과 소흐랍의 비극</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #070709;
+            --short-note: #ff2a4b;
+            --long-note: #0077ff;
+            --gold: #f5c842;
+            --gold-bright: #ffe875;
+            --danger-red: #e02424;
+            --panel-bg: rgba(14, 14, 20, 0.92);
+        }
+
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); color: #eee;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+            overflow: hidden; user-select: none;
+        }
+
+        /* 배경 세밀화 레이어 */
+        #bg-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('miniature.jpg') center/contain no-repeat;
+            opacity: 0.12; filter: grayscale(60%) blur(2px);
+            transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1;
+        }
+
+        /* 80% 미만 위험 경고 비넷 */
+        #danger-vignette {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 100px rgba(224, 36, 36, 0.6);
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+            z-index: 5;
+        }
+        #danger-vignette.active { opacity: 1; }
+
+        #game-wrapper {
+            position: relative; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: space-between;
+            z-index: 10;
+        }
+
+        /* [1. 상단 대형 텍스트 및 발음 동기화 패널] */
+        header {
+            padding: 24px 30px 10px;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+        }
+        #text-panel {
+            background: var(--panel-bg);
+            border: 2px solid #2e2e3a;
+            border-radius: 14px;
+            padding: 16px 40px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.85);
+            max-width: 1100px; width: 94%;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        #text-panel.pulse {
+            border-color: var(--gold);
+            box-shadow: 0 0 35px rgba(245, 200, 66, 0.45);
+        }
+
+        .header-meta {
+            font-size: 0.85rem; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px;
+        }
+
+        /* 페르시아어 원문 (단어 필기체 완전 보존) */
+        .verse-persian {
+            direction: rtl; font-size: 2.9rem; font-weight: 800; color: #e2c992;
+            font-family: 'Amiri', 'Traditional Arabic', serif;
+            line-height: 1.3; min-height: 65px;
+            display: flex; justify-content: center; gap: 14px;
+        }
+        .persian-word {
+            padding: 2px 8px; border-radius: 6px; transition: all 0.2s ease; opacity: 0.55;
+        }
+        .persian-word.active {
+            opacity: 1; color: #fff; text-shadow: 0 0 16px var(--gold);
+            background: rgba(245, 200, 66, 0.18);
+        }
+        .persian-word.hit {
+            opacity: 1; color: var(--gold-bright); text-shadow: 0 0 10px var(--gold);
+        }
+
+        /* 4음보 한글 발음 토막 및 하단 운율 기호(u, —) */
+        .verse-phonetic {
+            margin-top: 12px; font-size: 1.15rem; color: #aaa;
+            display: flex; justify-content: center; gap: 14px; direction: ltr;
+        }
+        .foot-block {
+            background: rgba(255,255,255,0.04); padding: 5px 12px; border-radius: 8px;
+            border: 1px solid #333; display: flex; gap: 10px;
+        }
+        .phon-syl {
+            position: relative; display: flex; flex-direction: column; align-items: center;
+            transition: all 0.15s ease; opacity: 0.45;
+        }
+        .phon-syl .meter-mark {
+            font-size: 0.75rem; color: #777; margin-top: 4px; font-family: sans-serif;
+        }
+        .phon-syl.active {
+            opacity: 1; color: #fff; font-weight: bold; text-shadow: 0 0 10px #fff;
+        }
+        .phon-syl.active .meter-mark { color: var(--gold); font-weight: bold; }
+        .phon-syl.hit {
+            opacity: 1; color: var(--gold); font-weight: bold;
+        }
+        .phon-syl.hit .meter-mark { color: var(--gold-bright); }
+
+        /* 한국어 완역문 */
+        .verse-korean {
+            font-size: 1.35rem; color: #eee; margin-top: 10px; font-weight: 500;
+            line-height: 1.4; min-height: 32px; font-family: 'Noto Serif KR', serif;
+        }
+
+        /* [2. 중단 태고식 타건 레일] */
+        #stage-area {
+            position: relative; width: 100%; height: 210px;
+            background: rgba(12, 12, 18, 0.95);
+            border-top: 2px solid #2c2c38; border-bottom: 2px solid #2c2c38;
+            box-shadow: 0 0 40px rgba(0,0,0,0.9);
+            display: flex; align-items: center; overflow: hidden;
+        }
+
+        /* 판정선 타겟 존 */
+        #hit-target {
+            position: absolute; left: 190px; width: 78px; height: 78px;
+            border-radius: 50%; border: 4px solid var(--gold);
+            background: rgba(245, 200, 66, 0.08);
+            box-shadow: 0 0 20px rgba(245, 200, 66, 0.3);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.85rem; color: var(--gold); font-weight: 800;
+            z-index: 20; transition: transform 0.08s ease, background 0.08s, border-color 0.1s;
+        }
+        #hit-target.pulsing {
+            transform: scale(1.18); background: rgba(245, 200, 66, 0.4);
+            box-shadow: 0 0 35px var(--gold);
+        }
+        #hit-target.holding {
+            border-color: #00e1ff; background: rgba(0, 225, 255, 0.3);
+            box-shadow: 0 0 30px #00e1ff; transform: scale(1.1);
+        }
+        #hit-target.miss-pulse {
+            border-color: var(--short-note) !important;
+            background: rgba(255, 42, 75, 0.3) !important;
+            box-shadow: 0 0 30px var(--short-note) !important;
+            transform: scale(0.95);
+        }
+
+        /* Miss 문구 팝업 이펙트 */
+        .miss-indicator {
+            position: absolute; left: 229px; top: 18px; transform: translateX(-50%);
+            font-size: 1.45rem; font-weight: 900; color: #ff3344; letter-spacing: 1px;
+            text-shadow: 0 0 14px rgba(255, 51, 68, 0.9);
+            pointer-events: none; z-index: 50;
+            animation: missFloat 0.45s ease-out forwards;
+        }
+        @keyframes missFloat {
+            0% { opacity: 1; transform: translate(-50%, 0) scale(1.25); }
+            100% { opacity: 0; transform: translate(-50%, -24px) scale(0.85); }
+        }
+
+        /* 음표 트랙 */
+        #note-track {
+            position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+        }
+
+        .note {
+            position: absolute; top: 66px; height: 78px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+            transform: translateX(100vw);
+        }
+        .note-short {
+            width: 78px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ff7b91 0%, var(--short-note) 70%, #99001a 100%);
+            border: 3px solid #ffb3c0;
+        }
+        .note-short::after {
+            content: ""; position: absolute; width: 16px; height: 16px;
+            border-radius: 50%; background: #fff; opacity: 0.8;
+            top: 16px; left: 16px;
+        }
+        .note-long {
+            width: 180px; border-radius: 39px;
+            background: linear-gradient(90deg, #55aaff 0%, var(--long-note) 50%, #0044aa 100%);
+            border: 3px solid #99ccff;
+            box-shadow: 0 0 20px rgba(0, 119, 255, 0.5);
+        }
+        .note-long.holding-active {
+            border-color: #fff; box-shadow: 0 0 30px #00e1ff; filter: brightness(1.3);
+        }
+
+        /* [3. 하단 게이지 및 HUD] */
+        footer {
+            padding: 12px 30px 24px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        #gauge-container {
+            width: 700px; max-width: 90%; height: 22px;
+            background: #14141c; border-radius: 11px; overflow: hidden;
+            border: 1px solid #444; position: relative; margin-bottom: 10px;
+        }
+        #gauge-bar {
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, #2ecc71, var(--gold));
+            transition: width 0.2s ease-out, background 0.3s;
+        }
+        #gauge-bar.danger {
+            background: linear-gradient(90deg, #900, var(--danger-red));
+        }
+        #gauge-target-line {
+            position: absolute; left: 80%; top: 0; width: 3px; height: 100%;
+            background: #fff; box-shadow: 0 0 10px #fff; z-index: 10;
+        }
+
+        .hud-stats {
+            display: flex; justify-content: space-between; width: 700px; max-width: 90%;
+            font-size: 1rem; color: #aaa; margin-bottom: 10px;
+        }
+        .accuracy-val { font-weight: 800; color: #fff; }
+        .danger-text { color: var(--danger-red) !important; animation: blink 1s infinite; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .controls-guide {
+            font-size: 0.85rem; color: #888; display: flex; gap: 20px; align-items: center;
+        }
+        .key-badge {
+            background: #252532; padding: 4px 10px; border-radius: 4px;
+            border: 1px solid #555; color: #fff; font-weight: bold;
+        }
+
+        /* [엔딩 및 모달] */
+        #ending-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(120, 0, 0, 0); z-index: 100; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; transition: all 1s ease;
+        }
+        #ending-screen.climax-active {
+            background: rgba(80, 0, 0, 0.8); opacity: 1; pointer-events: auto;
+        }
+        .climax-title {
+            font-size: 2.8rem; font-weight: 900; color: #fff; text-shadow: 0 0 30px #ff0000;
+            margin-bottom: 16px;
+        }
+        .climax-desc {
+            font-size: 1.2rem; max-width: 700px; text-align: center; line-height: 1.7; color: #fcebeb;
+        }
+        .restart-btn {
+            margin-top: 25px; padding: 12px 32px; background: #fff; color: #900;
+            font-weight: bold; border: none; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 0 25px rgba(255,255,255,0.4); font-size: 1rem;
+        }
+
+        #start-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(7,7,9,0.95); z-index: 200;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+/* =========================================================
+   PHASE II : 샤나메 페르시아어 타이핑
+========================================================= */
+
+#typing-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 30px;
+    overflow-y: auto;
+    background: rgba(7, 7, 9, 0.97);
+    color: #eee;
+}
+
+#typing-screen.active {
+    display: flex;
+}
+
+.typing-header {
+    width: 100%;
+    max-width: 1100px;
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.typing-phase-label {
+    color: #888;
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+}
+
+.typing-header h2 {
+    color: var(--gold);
+    font-size: 2rem;
+    margin: 0 0 7px;
+}
+
+.typing-header p {
+    color: #999;
+    margin: 0;
+}
+
+.typing-stats {
+    width: 900px;
+    max-width: 95%;
+    display: flex;
+    justify-content: center;
+    gap: 55px;
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #333;
+    border-radius: 10px;
+    margin-bottom: 22px;
+}
+
+.typing-stat {
+    text-align: center;
+    min-width: 90px;
+}
+
+.typing-stat-label {
+    color: #777;
+    font-size: 0.8rem;
+    margin-bottom: 3px;
+}
+
+.typing-stat-value {
+    color: #fff;
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-family: monospace;
+}
+
+#typing-display {
+    width: 1000px;
+    max-width: 95%;
+    min-height: 145px;
+    padding: 22px 28px;
+    background: rgba(18,18,24,0.96);
+    border: 2px solid #333;
+    border-radius: 14px;
+    box-shadow: 0 10px 35px rgba(0,0,0,.6);
+}
+
+.typing-target {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', sans-serif;
+    font-size: 2.5rem;
+    color: #8d8d97;
+    line-height: 1.5;
+    min-height: 58px;
+}
+
+.typing-input {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', sans-serif;
+    font-size: 2.5rem;
+    color: #fff;
+    line-height: 1.5;
+    min-height: 58px;
+    border-bottom: 2px solid #333;
+}
+
+.typing-correct {
+    color: var(--gold-bright);
+}
+
+.typing-wrong {
+    color: #ff4961;
+    background: rgba(255,42,75,.18);
+}
+
+.typing-cursor {
+    display: inline-block;
+    width: 13px;
+    height: 5px;
+    background: var(--gold);
+    vertical-align: bottom;
+    margin-right: 5px;
+    animation: typingBlink 1s infinite;
+}
+
+@keyframes typingBlink {
+    0%,100% { opacity:1; }
+    50% { opacity:0; }
+}
+
+#typing-translation {
+    width: 1000px;
+    max-width: 95%;
+    text-align: right;
+    font-size: 1.05rem;
+    color: #c9b879;
+    margin: 9px 0 18px;
+}
+
+
+/* 가상 페르시아어 키보드 */
+
+#typing-keyboard {
+    background: #dedee4;
+    padding: 10px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.typing-key-row {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+}
+
+.typing-key {
+    width: 40px;
+    height: 40px;
+    background: white;
+    color: #222;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.1rem;
+    font-family: 'Vazirmatn', sans-serif;
+    box-shadow: 0 2px 0 #999;
+    transition: .1s;
+    position: relative;
+}
+
+.typing-key .kor {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-family: sans-serif;
+    font-size: .52rem;
+    color: #aaa;
+}
+
+.typing-key.special {
+    width: auto;
+    padding: 0 10px;
+    font-family: sans-serif;
+    font-size: .75rem;
+    font-weight: bold;
+    background: #ccc;
+}
+
+.typing-key.backspace-key { width:85px; }
+.typing-key.tab-key { width:60px; }
+.typing-key.caps-key { width:75px; }
+.typing-key.enter-key { width:90px; }
+.typing-key.shift-l-key,
+.typing-key.shift-r-key { width:95px; }
+
+.typing-key.space-key {
+    width:320px;
+}
+
+.typing-key.target-led {
+    border: 3px solid #339af0;
+    box-shadow: 0 0 15px rgba(51,154,240,.8);
+    transform: translateY(-2px);
+}
+
+.typing-key.error-led {
+    border: 3px solid #f03e3e;
+    box-shadow: 0 0 15px rgba(240,62,62,.8);
+}
+
+.typing-key.pressed {
+    transform: translateY(2px);
+    box-shadow: none;
+    background: #bbb;
+}
+
+
+/* 손가락 가이드 */
+
+.typing-hands {
+    display: flex;
+    justify-content: center;
+    gap: 90px;
+    margin-top: 14px;
+    height: 72px;
+}
+
+.typing-hand {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.typing-finger {
+    width: 24px;
+    background: linear-gradient(#e9ecef,#adb5bd);
+    border-radius: 12px 12px 0 0;
+    border: 1px solid #888;
+    position: relative;
+    transition: .2s;
+}
+
+.typing-finger.f-pinky { height:48px; }
+.typing-finger.f-ring { height:64px; }
+.typing-finger.f-mid { height:75px; }
+.typing-finger.f-index { height:64px; }
+.typing-finger.f-thumb {
+    height:38px;
+    width:28px;
+    border-radius:10px;
+}
+
+.typing-finger.active {
+    background: linear-gradient(#ffe066,#fab005);
+    border-color: #f08c00;
+    box-shadow: 0 0 18px rgba(250,176,5,.7);
+    transform: translateY(-6px);
+}
+
+
+/* 타이핑 최종 엔딩 */
+
+#typing-ending-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+    background:
+        linear-gradient(rgba(7,7,9,.55), rgba(20,0,0,.88)),
+        url('miniature.jpg') center/contain no-repeat,
+        #070709;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+}
+
+#typing-ending-screen.active {
+    display: flex;
+    opacity: 1;
+}
+
+.typing-ending-eyebrow {
+    color: var(--gold);
+    letter-spacing: 4px;
+    font-size: .85rem;
+    margin-bottom: 12px;
+}
+
+.typing-ending-title {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 3rem;
+    color: #fff;
+    text-shadow: 0 0 25px rgba(245,200,66,.5);
+    margin-bottom: 20px;
+}
+
+.typing-ending-desc {
+    max-width: 720px;
+    line-height: 1.9;
+    font-size: 1.15rem;
+    color: #ddd;
+}
+
+.typing-ending-stats {
+    margin-top: 25px;
+    color: var(--gold-bright);
+    font-weight: bold;
+    font-size: 1.05rem;
+}
+
+/* =========================================================
+   PROLOGUE : 샤나메 필사본 복원 퀴즈
+========================================================= */
+
+#quiz-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 260;
+    background: #070709;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+#quiz-miniature {
+    position: absolute;
+    inset: 0;
+    background: url('miniature.jpg') center/contain no-repeat;
+    opacity: .08;
+    filter: grayscale(60%);
+    transition: opacity 1s ease, filter 1s ease;
+}
+
+.quiz-panel {
+    position: relative;
+    z-index: 2;
+    width: min(760px, 94vw);
+    padding: 35px 40px;
+    background: rgba(12,12,18,.94);
+    border: 1px solid #3a3526;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.8);
+}
+
+.quiz-meta {
+    color: var(--gold);
+    font-size: .8rem;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+}
+
+.quiz-title {
+    font-size: 1.8rem;
+    margin: 0 0 12px;
+}
+
+.quiz-progress {
+    color: #777;
+    font-size: .85rem;
+    margin-bottom: 26px;
+}
+
+.quiz-question {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 1.35rem;
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+
+.quiz-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.quiz-option {
+    padding: 17px 12px;
+    border: 1px solid #555;
+    border-radius: 9px;
+    background: #17171f;
+    color: #eee;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: .2s;
+}
+
+.quiz-option:hover {
+    border-color: var(--gold);
+    transform: translateY(-2px);
+}
+
+.quiz-option.correct {
+    color: #111;
+    background: var(--gold);
+    border-color: var(--gold);
+}
+
+.quiz-option.wrong {
+    border-color: #e02424;
+    color: #ff7b89;
+}
+
+#quiz-feedback {
+    display: none;
+    margin-top: 22px;
+    padding: 18px 20px;
+    border-left: 3px solid var(--gold);
+    background: rgba(245,200,66,.07);
+    line-height: 1.7;
+}
+
+#quiz-feedback strong {
+    color: var(--gold-bright);
+}
+
+#quiz-next {
+    display: none;
+    margin-top: 20px;
+}
+
+.quiz-folios {
+    display: flex;
+    gap: 7px;
+    margin-top: 22px;
+}
+
+.quiz-folio {
+    flex: 1;
+    height: 4px;
+    background: #333;
+    transition: .5s;
+}
+
+.quiz-folio.restored {
+    background: var(--gold);
+    box-shadow: 0 0 10px rgba(245,200,66,.5);
+}
+
+/* 퀴즈 완료 후 세밀화 전체 공개 */
+#quiz-screen.reveal-complete #quiz-miniature {
+    opacity: 1;
+    filter: grayscale(0%) blur(0);
+}
+
+#quiz-miniature {
+    transition:
+        opacity 1.2s ease,
+        filter 1.2s ease;
+}
+
+#quiz-screen.reveal-complete .quiz-panel {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .8s ease;
+}
+
+/* ===== 리듬게임 : 읽기 → 연행 단계 ===== */
+
+#rhythm-mode-label {
+    margin-top: 5px;
+    color: var(--gold);
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    transition: opacity .3s;
+}
+
+#stage-area {
+    transition: opacity .45s ease;
+}
+
+/* 읽기 단계 */
+#game-wrapper.reading #stage-area {
+    opacity: 0.15;
+}
+
+#game-wrapper.reading .verse-persian {
+    transform: scale(1.04);
+    transition: transform .4s ease;
+}
+
+#game-wrapper.reading .persian-word {
+    opacity: 1;
+}
+
+/* 연행 단계 */
+#game-wrapper.performing #stage-area {
+    opacity: 1;
+}
+
+/* 연행 중에는 번역을 시각적으로 물림 */
+#display-korean {
+    transition: opacity .35s ease;
+}
+
+#game-wrapper.performing #display-korean {
+    opacity: 0.12;
+}
+
+
+/* 현재 음보 강조 */
+.foot-block {
+    transition: all .2s ease;
+}
+
+.foot-block.active-foot {
+    opacity: 1;
+    color: #fff;
+    border-color: var(--gold);
+    background: rgba(245, 200, 66, 0.18);
+    box-shadow: 0 0 18px rgba(245,200,66,.22);
+    transform: translateY(-2px);
+}
+
+.foot-block.foot-hit {
+    opacity: .75;
+    border-color: #777;
+}
+    </style>
+</head>
+<body>
+
+    <audio id="naqqali-audio" src="naqqali.m4a"></audio>
+    <div id="bg-canvas"></div>
+    <div id="danger-vignette"></div>
+
+    <!-- 시작 안내 모달 -->
+<!-- =====================================================
+     PROLOGUE : 샤나메 필사본 복원
+===================================================== -->
+<div id="quiz-screen">
+
+    <div id="quiz-miniature"></div>
+
+    <div class="quiz-panel">
+
+        <div class="quiz-meta">
+            PROLOGUE · RESTORE THE SHAHNAMEH
+        </div>
+
+        <h1 class="quiz-title">
+            흩어진 서사의 조각
+        </h1>
+
+<div id="quiz-intro" style="text-align:center; margin-top:30px;">
+    <p style="
+        color:#aaa;
+        line-height:1.8;
+        margin-bottom:25px;
+        font-family:'Noto Serif KR', serif;
+    ">
+        천 년을 건너온 이야기는 완전한 모습으로 남지 않았습니다.<br>
+        흩어진 네 개의 서사 조각을 되찾고,
+        로스탐과 소흐랍의 비극 속으로 들어가십시오.
+    </p>
+
+    <button
+        class="restart-btn"
+        style="background:var(--gold); color:#111;"
+        onclick="startQuizPrologue()">
+        첫 장을 펼치기
+    </button>
+</div>
+
+<div
+    class="quiz-progress"
+    id="quiz-progress"
+    style="display:none;">
+    FOLIO 1 / 4
+</div>
+
+
+<div
+    class="quiz-question"
+    id="quiz-question"
+    style="display:none;">
+</div>
+
+
+<div
+    class="quiz-options"
+    id="quiz-options"
+    style="display:none;">
+</div>
+
+
+<div id="quiz-feedback"></div>
+
+
+<button
+    id="quiz-next"
+    class="restart-btn"
+    style="background:var(--gold); color:#111;"
+    onclick="nextQuiz()">
+    다음 조각
+</button>
+
+
+<div
+    class="quiz-folios"
+    style="display:none;">
+
+    <div class="quiz-folio"></div>
+    <div class="quiz-folio"></div>
+    <div class="quiz-folio"></div>
+    <div class="quiz-folio"></div>
+
+</div>
+
+
+    </div>
+</div>
+
+    <div id="start-modal">
+        <h1 style="color:var(--gold); margin-bottom: 12px; font-size: 2.2rem;">샤나메: 비극의 모타가렙</h1>
+<p style="color:#aaa; max-width:600px; text-align:center; line-height:1.8; margin-bottom:25px;">
+    각 행의 원문과 번역을 먼저 읽은 뒤,
+    <strong style="color:var(--gold);">모타가렙 운율의 호흡</strong>을 직접 연행합니다.<br>
+    단음(<span style="color:var(--short-note)">붉은 원</span>)은 가볍게 탭하고,
+    장음(<span style="color:var(--long-note)">푸른 바</span>)은 유지하십시오.<br><br>
+    점수는 승패가 아니라 <strong>운율과 얼마나 동기화되었는지</strong>를 보여줍니다.
+</p>
+        <button class="restart-btn" style="color:#111; background:var(--gold);" onclick="startGame()">연행 시작하기 (Enter)</button>
+    </div>
+
+<!-- 리듬게임 엔딩 화면 -->
+<div id="ending-screen">
+    <div class="climax-title" id="ending-title">비극의 전이와 완성</div>
+    <div class="climax-desc" id="ending-desc"></div>
+
+    <div style="display:flex; gap:12px; margin-top:25px;">
+        <button
+            class="restart-btn"
+            style="margin-top:0; background:var(--gold); color:#111;"
+            onclick="startTypingPhase()">
+            원문 타이핑으로 계속
+        </button>
+
+        <button
+            class="restart-btn"
+            style="margin-top:0;"
+            onclick="location.reload()">
+            여기서 종료 / 다시 플레이
+        </button>
+    </div>
+</div>
+
+<!-- =====================================================
+     PHASE II : 나깔리 '투머르' 타이핑
+===================================================== -->
+<div id="typing-screen">
+
+    <div class="typing-header">
+        <div class="typing-phase-label">FINAL · TUMAR</div>
+        <h2>나깔리 대본 '투머르' 옮겨쓰기</h2>
+        <p>방금 연행한 「로스탐과 소흐랍」의 구연 대본을 따라 읽고, 핵심 구절을 직접 옮겨 쓰십시오.</p>
+    </div>
+
+    <div class="typing-stats">
+        <div class="typing-stat">
+            <div class="typing-stat-label">진행도</div>
+            <div class="typing-stat-value" id="typing-progress">1 / 7</div>
+        </div>
+
+        <div class="typing-stat">
+            <div class="typing-stat-label">시간</div>
+            <div class="typing-stat-value" id="typing-time">0:00</div>
+        </div>
+
+        <div class="typing-stat">
+            <div class="typing-stat-label">타수</div>
+            <div class="typing-stat-value" id="typing-cpm">0</div>
+        </div>
+
+        <div class="typing-stat">
+            <div class="typing-stat-label">정확도</div>
+            <div class="typing-stat-value" id="typing-acc">100%</div>
+        </div>
+    </div>
+
+    <div id="typing-display"></div>
+    <div id="typing-translation"></div>
+
+    <div id="typing-keyboard"></div>
+
+    <div class="typing-hands">
+        <div class="typing-hand">
+            <div class="typing-finger f-pinky" id="tf-l-pinky"></div>
+            <div class="typing-finger f-ring" id="tf-l-ring"></div>
+            <div class="typing-finger f-mid" id="tf-l-mid"></div>
+            <div class="typing-finger f-index" id="tf-l-index"></div>
+            <div class="typing-finger f-thumb" id="tf-space-l"></div>
+        </div>
+
+        <div class="typing-hand">
+            <div class="typing-finger f-thumb" id="tf-space-r"></div>
+            <div class="typing-finger f-index" id="tf-r-index"></div>
+            <div class="typing-finger f-mid" id="tf-r-mid"></div>
+            <div class="typing-finger f-ring" id="tf-r-ring"></div>
+            <div class="typing-finger f-pinky" id="tf-r-pinky"></div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     PHASE IV : 최종 엔딩
+===================================================== -->
+<div id="typing-ending-screen">
+
+    <div class="typing-ending-eyebrow">
+        ROSTAM & SOHRAB · EPILOGUE
+    </div>
+
+    <div class="typing-ending-title">
+        너무 늦게 읽힌 징표
+    </div>
+
+    <div class="typing-ending-desc">
+        로스탐이 소흐랍에게 남겨진 징표를 알아본 순간,
+        승리는 곧 돌이킬 수 없는 상실로 뒤집힙니다.<br><br>
+
+        운율을 두드리고 원문을 다시 써 내려갔지만
+        이미 완성된 비극의 결말은 바뀌지 않습니다.
+        남는 것은 뒤늦은 인식과, 기억하고 다시 이야기하는 행위뿐입니다.
+    </div>
+
+    <div class="typing-ending-stats" id="typing-final-stats"></div>
+
+    <button
+        class="restart-btn"
+        style="margin-top:30px; background:var(--gold); color:#111;"
+        onclick="location.reload()">
+        처음부터 다시하기
+    </button>
+
+</div>
+
+    <div id="game-wrapper">
+        <!-- 상단 텍스트 및 발음 동기화 영역 -->
+        <header>
+            <div id="text-panel">
+                <div class="header-meta" id="line-counter">대구 1 / 5 (1행)</div>
+
+<div id="rhythm-mode-label">
+    원문을 먼저 읽으십시오
+</div>
+
+                <div class="verse-persian" id="persian-container"></div>
+                <div class="verse-phonetic" id="phonetic-container"></div>
+                <div class="verse-korean" id="display-korean"></div>
+            </div>
+        </header>
+
+        <!-- 중단 태고식 레일 -->
+        <div id="stage-area">
+            <div id="hit-target">판정</div>
+            <div id="note-track"></div>
+        </div>
+
+        <!-- 하단 게이지 & HUD -->
+        <footer>
+<div class="hud-stats">
+    <span>모타가렙 운율 동기화율</span>
+
+    <span>
+        <span class="accuracy-val" id="acc-text">100%</span>
+        · 현재 음보
+        <span id="foot-text">1</span> / 4
+    </span>
+</div>
+
+<div id="gauge-container">
+    <div id="gauge-bar"></div>
+</div>
+            <div class="controls-guide">
+                <span>조작: <span class="key-badge">Space</span> 또는 <span class="key-badge">D</span> / <span class="key-badge">K</span></span>
+                <span>단음: 탭 | 장음: 홀드 · 놓친 음표만 동기화율에 반영</span>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        /* -------------------------------------------------------------
+           1. 페르시아 고전 시학(Taqti'/Naql) 정밀 반영 10행 데이터셋
+           운율: [단, 장, 장 | 단, 장, 장 | 단, 장, 장 | 단, 장] (v – – | v – – | v – – | v –)
+        ------------------------------------------------------------- */
+        const ALL_LYRICS = [
+            {
+                words: ["زدش", "بر", "زمین", "بر", "به کردار", "شیر"],
+                sylToWord: [0, 0, 1, 2, 2, 3, 4, 4, 4, 5, 5],
+                phon_feet: [["자", "다시", "바르"], ["자", "민", "바르"], ["베", "케르", "다"], ["레", "쉬르"]],
+                k: "그(로스탐)는 사자처럼 그(소흐랍)를 땅에 내리쳤으니,"
+            },
+            {
+                words: ["بدانست", "کاو", "هم", "نماند", "به زیر"],
+                sylToWord: [0, 0, 0, 0, 1, 2, 3, 3, 3, 4, 4],
+                phon_feet: [["베", "다", "네스"], ["테", "쿠", "함"], ["나", "만", "드"], ["베", "지르"]],
+                k: "그가 밑에 가만히 누워있지 않을 것을 알았기 때문이다."
+            },
+            {
+                words: ["سبک", "تیغ", "تیز", "از", "میان", "برکشید"],
+                sylToWord: [0, 0, 1, 1, 2, 3, 4, 4, 5, 5, 5],
+                phon_feet: [["사", "보크", "티"], ["게", "티", "자즈"], ["메", "얀", "바르"], ["케", "쉬드"]],
+                k: "재빠르게 허리에서 날카로운 단검을 뽑아,"
+            },
+            {
+                // 음절 결함 교정본 (بر آن شیر...) 반영
+                words: ["بر آن", "شیر", "بیدار", "دل", "بردرید"],
+                sylToWord: [0, 0, 1, 1, 2, 2, 2, 3, 4, 4, 4],
+                phon_feet: [["바", "란", "쉬"], ["레", "비", "다"], ["레", "델", "바르"], ["다", "리드"]],
+                k: "깨어있는 심장을 가진(용맹한) 사자의 가슴을 찔러 버렸다."
+            },
+            {
+                words: ["چو", "بگشاد", "خفتان", "و آن", "مهره", "دید"],
+                sylToWord: [0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5],
+                phon_feet: [["초", "복", "샤"], ["데", "호프", "탄"], ["노", "안", "모흐"], ["레", "디드"]],
+                k: "갑옷을 열어 그 징표를 보자마자,"
+            },
+            {
+                words: ["همه", "جامه", "بر", "خویشتن", "بردرید"],
+                sylToWord: [0, 0, 1, 1, 2, 3, 3, 3, 4, 4, 4],
+                phon_feet: [["하", "메", "자"], ["메", "바르", "휘"], ["셰", "탄", "바르"], ["다", "리드"]],
+                k: "그는 자기 몸에 걸친 모든 옷을 찢어버렸다."
+            },
+            {
+                words: ["همی", "گفت", "کای", "کشته", "بر", "دست", "من"],
+                sylToWord: [0, 0, 1, 1, 2, 3, 3, 4, 5, 5, 6],
+                phon_feet: [["하", "미", "고프"], ["테", "카이", "코쉬"], ["테", "바르", "다스"], ["테", "만"]],
+                k: "그는 “아아, 내 손에 죽은 자여,”"
+            },
+            {
+                words: ["دلیر", "و ستوده", "به هر", "انجمن"],
+                sylToWord: [0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3],
+                phon_feet: [["다", "리", "로"], ["세", "투", "데"], ["베", "하르", "안"], ["조", "만"]],
+                k: "“모든 무리에서 용맹하고 칭송받던 자여”라 말하며,"
+            },
+            {
+                words: ["همی", "ریخت", "خون", "و همی", "کند", "موی"],
+                sylToWord: [0, 0, 1, 1, 2, 3, 3, 3, 4, 4, 5],
+                phon_feet: [["하", "미", "리흐"], ["테", "후", "노"], ["하", "미", "칸"], ["데", "무이"]],
+                k: "피눈물을 흘리고 자신의 머리털을 쥐어뜯었다."
+            },
+            {
+                words: ["سرش", "پر", "ز خاک", "و پر", "از آب", "روی"],
+                sylToWord: [0, 0, 1, 2, 2, 3, 3, 4, 4, 4, 5],
+                phon_feet: [["사", "라시", "포르"], ["제", "하", "코"], ["포", "라", "자"], ["베", "루이"]],
+                k: "그의 머리는 흙먼지로, 얼굴은 눈물로 뒤덮였다."
+            }
+        ];
+
+/* 기존 원문 3~9행만 리듬게임에 사용 */
+const lyrics = ALL_LYRICS.slice(2, 9);
+
+        const METER_PATTERN = [0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1]; // 0: 단, 1: 장
+        const METER_SYMBOLS = ['u', '—', '—', 'u', '—', '—', 'u', '—', '—', 'u', '—'];
+        
+        const METER_INTERVALS = [0, 420, 950, 1600, 2020, 2550, 3200, 3620, 4150, 4800, 5220];
+        const LONG_DURATION = 400;     // 기본 장음 길이 (ms)
+        const MIN_HOLD_REQUIRED = 220; // 대폭 완화된 최소 홀드 인정 시간 (220ms)
+	const READ_PREVIEW_MS = 3000;   // 원문 읽기 시간
+	const FIRST_HIT_OFFSET = 6000;  // 첫 음표 판정 시점
+	const LINE_DELAY = 12000;
+
+	const NOTE_SPEED = 0.45;
+	const TARGET_X = 190;
+	const LATE_GRACE_MS = 350; // * 렉/늦은 입력 보정 *
+
+        /* -------------------------------------------------------------
+           2. Web Audio API 신디사이저
+        ------------------------------------------------------------- */
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playTaikoSound(isLong) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            if (!isLong) {
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+                gain.gain.setValueAtTime(0.7, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now); osc.stop(now + 0.08);
+            } else {
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(45, now + 0.75);
+                gain.gain.setValueAtTime(0.9, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.75);
+                osc.start(now); osc.stop(now + 0.75);
+            }
+            osc.connect(gain); gain.connect(audioCtx.destination);
+        }
+
+        /* -------------------------------------------------------------
+           3. 게임 엔진 상태
+        ------------------------------------------------------------- */
+        const totalNotesCount =
+        lyrics.length * METER_PATTERN.length;
+        let activeNotes = [];
+        let missCount = 0;
+        let combo = 0;
+        let currentAccuracy = 100;
+        let processedNotes = 0;
+        let gameStartTime = 0;
+        let isRunning = false;
+        let currentHoldingNote = null;
+        let currentDisplayedLine = -1;
+	let rhythmSubPhase = 'reading';
+
+/* =========================================================
+   전체 프로그램 단계
+========================================================= */
+
+let appPhase = 'quiz';
+// quiz → intro → rhythm → ending → typing → final
+
+/* =========================================================
+   PROLOGUE : QUIZ
+========================================================= */
+
+const QUIZ_DATA = [
+    {
+        q: "페르도시는 『샤나메』 집필에 약 몇 년을 바쳤다고 널리 전해질까?",
+        options: ["10년", "20년", "30년"],
+        answer: 2,
+        explanation:
+            "『샤나메』는 약 30년에 걸친 대작업으로 널리 알려져 있습니다. 페르도시는 오랜 기간 이란의 신화와 영웅 전승을 거대한 서사시로 재구성했고, 작품은 1010년경 완성되었습니다."
+    },
+
+    {
+        q: "『샤나메(شاهنامه)』라는 제목의 뜻으로 가장 알맞은 것은?",
+        options: ["왕들의 책", "영웅의 노래", "이란의 역사"],
+        answer: 0,
+        explanation:
+            "샤(شاه)는 '왕', 나메(نامه)는 '책·서(書)'를 뜻합니다. 『샤나메』는 왕들의 이야기에서 출발해 이란의 신화·영웅·역사를 아우르는 거대한 국민서사시가 되었습니다."
+    },
+
+    {
+        q: "로스탐과 소흐랍의 관계는 무엇일까?",
+        options: ["형제", "아버지와 아들", "스승과 제자"],
+        answer: 1,
+        explanation:
+            "소흐랍은 로스탐과 타흐미네 사이에서 태어난 아들입니다. 그러나 두 사람은 서로의 정체를 제대로 알지 못한 채 전장에서 적으로 만나게 됩니다."
+    },
+
+    {
+        q: "「로스탐과 소흐랍」 비극의 흐름을 올바르게 배열한 것은?",
+        options: [
+            "정체 확인 → 결투 → 치명상",
+            "결투 → 치명상 → 정체 확인",
+            "치명상 → 정체 확인 → 결투"
+        ],
+        answer: 1,
+        explanation:
+            "두 사람은 먼저 결투하고, 로스탐은 소흐랍에게 치명상을 입힙니다. 아버지와 아들이라는 인식은 그 뒤에야 찾아옵니다. 이 '너무 늦은 인식'이 비극의 핵심입니다."
+    }
+];
+
+let quizIndex = 0;
+let quizLocked = false;
+
+function startQuizPrologue() {
+
+    document.getElementById('quiz-intro').style.display = 'none';
+
+    document.getElementById('quiz-progress').style.display = 'block';
+    document.getElementById('quiz-question').style.display = 'block';
+    document.getElementById('quiz-options').style.display = 'grid';
+
+    document.querySelector('.quiz-folios').style.display = 'flex';
+
+    renderQuiz();
+}
+
+function renderQuiz() {
+
+    const data = QUIZ_DATA[quizIndex];
+
+    quizLocked = false;
+
+    document.getElementById('quiz-progress').innerText =
+        `FOLIO ${quizIndex + 1} / ${QUIZ_DATA.length}`;
+
+    document.getElementById('quiz-question').innerText = data.q;
+
+    const options = document.getElementById('quiz-options');
+    options.innerHTML = "";
+
+const shuffledOptions = data.options
+    .map((text, originalIndex) => ({
+        text,
+        originalIndex
+    }))
+    .sort(() => Math.random() - 0.5);
+
+
+shuffledOptions.forEach(option => {
+
+    const btn = document.createElement('button');
+
+    btn.className = 'quiz-option';
+    btn.innerText = option.text;
+
+    btn.onclick = () =>
+        answerQuiz(option.originalIndex, btn);
+
+    options.appendChild(btn);
+});
+
+    document.getElementById('quiz-feedback').style.display = 'none';
+    document.getElementById('quiz-next').style.display = 'none';
+}
+
+
+function answerQuiz(index, button) {
+
+    if (quizLocked) return;
+
+    const data = QUIZ_DATA[quizIndex];
+
+    if (index !== data.answer) {
+
+        button.classList.add('wrong');
+
+        setTimeout(() => {
+            button.classList.remove('wrong');
+        }, 500);
+
+        return;
+    }
+
+    quizLocked = true;
+    button.classList.add('correct');
+
+    const feedback = document.getElementById('quiz-feedback');
+
+    feedback.innerHTML =
+        `<strong>정답입니다. 서사의 조각이 복원되었습니다.</strong><br>` +
+        data.explanation;
+
+    feedback.style.display = 'block';
+
+    document
+        .querySelectorAll('.quiz-folio')[quizIndex]
+        .classList.add('restored');
+
+
+    /* 배경 세밀화가 점점 드러남 */
+    const reveal =
+        0.08 + ((quizIndex + 1) / QUIZ_DATA.length) * 0.72;
+
+    const miniature = document.getElementById('quiz-miniature');
+
+    miniature.style.opacity = reveal;
+
+    if (quizIndex === QUIZ_DATA.length - 1) {
+        miniature.style.filter = 'grayscale(0%)';
+    }
+
+
+const next = document.getElementById('quiz-next');
+
+
+/* 마지막 문제까지 복원 완료 */
+if (quizIndex === QUIZ_DATA.length - 1) {
+
+    next.style.display = 'none';
+
+    /* 정답 해설을 잠깐 읽을 시간 */
+    setTimeout(() => {
+        revealCompletedMiniature();
+    }, 1800);
+
+} else {
+
+    next.style.display = 'inline-block';
+    next.innerText = '다음 조각';
+}
+
+}
+
+
+function nextQuiz() {
+
+    if (!quizLocked) return;
+
+    quizIndex++;
+
+    if (quizIndex >= QUIZ_DATA.length) {
+
+        finishQuizPrologue();
+
+        return;
+    }
+
+    renderQuiz();
+}
+
+function revealCompletedMiniature() {
+
+    const screen =
+        document.getElementById('quiz-screen');
+
+    const miniature =
+        document.getElementById('quiz-miniature');
+
+
+    /* 세밀화 완전 복원 */
+    screen.classList.add('reveal-complete');
+
+    miniature.style.opacity = '1';
+    miniature.style.filter = 'grayscale(0%) blur(0px)';
+
+
+    /* 3초간 감상 */
+    setTimeout(() => {
+
+        finishQuizPrologue();
+
+    }, 4000);
+}
+
+function finishQuizPrologue() {
+
+    appPhase = 'intro';
+
+    const screen =
+        document.getElementById('quiz-screen');
+
+
+    /* 복원된 세밀화에서 천천히 암전 */
+    screen.style.transition = 'opacity 1.2s ease';
+    screen.style.opacity = '0';
+
+
+    setTimeout(() => {
+
+        screen.style.display = 'none';
+
+        document
+            .getElementById('start-modal')
+            .style.display = 'flex';
+
+    }, 1200);
+}
+
+/* =========================================================
+   PHASE II : 나깔리 투머르 타이핑 데이터
+========================================================= */
+
+/* 기본 하드코딩 데이터 */
+const DEFAULT_TYPING_DATA = [
+    {
+        p: "خنحر انداخت چشم رستم افتاد",
+        k: "단검을 떨어뜨린 로스탐의 시선이,",
+	mode: "type"
+    },
+    {
+        p: "به مهره ای که داده بود به تهمینه",
+        k: "자신이 타흐미네에게 주었던 징표에 꽂혔다.",
+	mode: "show"
+    },
+    {
+        p: "آه یک نعره کشید سهراب برومندم میوه ی دلم",
+        k: "아아, 그가 절규했다. “나의 늠름한 소흐랍아, 내 마음의 열매여!”",
+	mode: "show"
+    },
+    {
+        p: "مرگ بر من تو را با دست خودم کشتم",
+        k: "“내가 내 손으로 너를 죽였구나!”",
+	mode: "type"
+    },
+    {
+        p: "گفت گیو برو به کیکاووس",
+         k: "로스탐이 말하길 “기브여, 케이커브스에게 가서,”",
+	mode: "show"
+    },
+    {
+        p: "بگو نوش دارو بده بچم از دستم رفت",
+        k: "“명약을 달라고 전해라. 내 아이가 죽어간다.”",
+	mode: "show"
+    },
+    {
+        p: "بچمو کشتم",
+        k: "“내가 내 새끼를 죽였어.”",
+	mode: "type"
+    }
+];
+
+let typingData = [...DEFAULT_TYPING_DATA];
+
+let typingStageIndex = 0;
+let typingTarget = [];
+let typingInput = [];
+
+let typingStartTime = null;
+let typingTimer = null;
+
+let typingTotalKeys = 0;
+let typingCorrectKeys = 0;
+
+let typingShiftDown = false;
+
+
+/* =========================================================
+   ISIRI 9147 페르시아어 표준 키보드
+========================================================= */
+
+const typingKbLayout = [
+    [
+        {id:'Backquote',p:'÷',s:'~',e:'`',z:'l-pinky'},
+        {id:'Digit1',p:'۱',s:'!',e:'1',z:'l-pinky'},
+        {id:'Digit2',p:'۲',s:'٫',e:'2',z:'l-ring'},
+        {id:'Digit3',p:'۳',s:'٬',e:'3',z:'l-mid'},
+        {id:'Digit4',p:'۴',s:'﷼',e:'4',z:'l-index'},
+        {id:'Digit5',p:'۵',s:'٪',e:'5',z:'l-index'},
+        {id:'Digit6',p:'۶',s:'×',e:'6',z:'r-index'},
+        {id:'Digit7',p:'۷',s:'،',e:'7',z:'r-index'},
+        {id:'Digit8',p:'۸',s:'*',e:'8',z:'r-mid'},
+        {id:'Digit9',p:'۹',s:')',e:'9',z:'r-ring'},
+        {id:'Digit0',p:'۰',s:'(',e:'0',z:'r-pinky'},
+        {id:'Minus',p:'-',s:'ـ',e:'-',z:'r-pinky'},
+        {id:'Equal',p:'=',s:'+',e:'=',z:'r-pinky'},
+        {id:'Backspace',p:'Back',e:'',z:'special',cls:'backspace-key'}
+    ],
+    [
+        {id:'Tab',p:'Tab',e:'',z:'special',cls:'tab-key'},
+        {id:'KeyQ',p:'ض',s:'ْ',e:'ㅂ',z:'l-pinky'},
+        {id:'KeyW',p:'ص',s:'ٌ',e:'ㅈ',z:'l-ring'},
+        {id:'KeyE',p:'ث',s:'ٍ',e:'ㄷ',z:'l-mid'},
+        {id:'KeyR',p:'ق',s:'ً',e:'ㄱ',z:'l-index'},
+        {id:'KeyT',p:'ف',s:'ُ',e:'ㅅ',z:'l-index'},
+        {id:'KeyY',p:'غ',s:'ِ',e:'ㅛ',z:'r-index'},
+        {id:'KeyU',p:'ع',s:'َ',e:'ㅕ',z:'r-index'},
+        {id:'KeyI',p:'ه',s:'ّ',e:'ㅑ',z:'r-mid'},
+        {id:'KeyO',p:'خ',s:']',e:'ㅐ',z:'r-ring'},
+        {id:'KeyP',p:'ح',s:'[',e:'ㅔ',z:'r-pinky'},
+        {id:'BracketLeft',p:'ج',s:'}',e:'[',z:'r-pinky'},
+        {id:'BracketRight',p:'چ',s:'{',e:']',z:'r-pinky'},
+        {id:'Backslash',p:'\\',s:'|',e:'₩',z:'r-pinky'}
+    ],
+    [
+        {id:'CapsLock',p:'Caps',e:'',z:'special',cls:'caps-key'},
+        {id:'KeyA',p:'ش',s:'ؤ',e:'ㅁ',z:'l-pinky'},
+        {id:'KeyS',p:'س',s:'ئ',e:'ㄴ',z:'l-ring'},
+        {id:'KeyD',p:'ی',s:'ي',e:'ㅇ',z:'l-mid'},
+        {id:'KeyF',p:'ب',s:'إ',e:'ㄹ',z:'l-index'},
+        {id:'KeyG',p:'ل',s:'أ',e:'ㅎ',z:'l-index'},
+        {id:'KeyH',p:'ا',s:'آ',e:'ㅗ',z:'r-index'},
+        {id:'KeyJ',p:'ت',s:'ة',e:'ㅓ',z:'r-index'},
+        {id:'KeyK',p:'ن',s:'»',e:'ㅏ',z:'r-mid'},
+        {id:'KeyL',p:'م',s:'«',e:'ㅣ',z:'r-ring'},
+        {id:'Semicolon',p:'ک',s:':',e:';',z:'r-pinky'},
+        {id:'Quote',p:'گ',s:'"',e:"'",z:'r-pinky'},
+        {id:'Enter',p:'Enter',e:'',z:'special',cls:'enter-key'}
+    ],
+    [
+        {id:'ShiftLeft',p:'Shift',e:'',z:'special',cls:'shift-l-key'},
+        {id:'KeyZ',p:'ظ',s:'ك',e:'ㅋ',z:'l-pinky'},
+        {id:'KeyX',p:'ط',s:'ٓ',e:'ㅌ',z:'l-ring'},
+        {id:'KeyC',p:'ز',s:'ژ',e:'ㅊ',z:'l-mid'},
+        {id:'KeyV',p:'ر',s:'ٰ',e:'ㅍ',z:'l-index'},
+        {id:'KeyB',p:'ذ',s:'‌',e:'ㅠ',z:'l-index'},
+        {id:'KeyN',p:'د',s:'ٔ',e:'ㅜ',z:'r-index'},
+        {id:'KeyM',p:'پ',s:'ء',e:'ㅡ',z:'r-index'},
+        {id:'Comma',p:'و',s:'<',e:',',z:'r-mid'},
+        {id:'Period',p:'.',s:'>',e:'.',z:'r-ring'},
+        {id:'Slash',p:'/',s:'؟',e:'/',z:'r-pinky'},
+        {id:'ShiftRight',p:'Shift',e:'',z:'special',cls:'shift-r-key'}
+    ]
+];
+
+const typingCharToKey = {};
+const typingShiftMap = {};
+
+/* =========================================================
+   가상 키보드 생성
+========================================================= */
+
+function initTypingKeyboard() {
+    const area = document.getElementById('typing-keyboard');
+
+    area.innerHTML = "";
+
+    Object.keys(typingCharToKey).forEach(k => delete typingCharToKey[k]);
+    Object.keys(typingShiftMap).forEach(k => delete typingShiftMap[k]);
+
+    typingKbLayout.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'typing-key-row';
+
+        row.forEach(key => {
+            const el = document.createElement('div');
+
+            el.id = `typing-${key.id}`;
+
+            el.className =
+                `typing-key zone-${key.z} ${key.cls || ''}`;
+
+            if (key.z === 'special') {
+                el.innerText = key.p;
+            } else {
+                el.innerHTML =
+                    `<span class="kor">${key.e}</span>` +
+                    `<span class="p-char">${key.p}</span>`;
+
+                typingCharToKey[key.p] = key.id;
+                typingShiftMap[key.p] = false;
+
+                if (key.s) {
+                    typingCharToKey[key.s] = key.id;
+                    typingShiftMap[key.s] = true;
+                }
+            }
+
+            rowDiv.appendChild(el);
+        });
+
+        area.appendChild(rowDiv);
+    });
+
+    const spaceRow = document.createElement('div');
+    spaceRow.className = 'typing-key-row';
+
+    const space = document.createElement('div');
+    space.id = 'typing-Space';
+    space.className = 'typing-key zone-space space-key';
+    space.innerText = 'Space';
+
+    spaceRow.appendChild(space);
+    area.appendChild(spaceRow);
+
+    typingCharToKey[' '] = 'Space';
+}
+
+
+/* =========================================================
+   타이핑 단계 시작
+========================================================= */
+
+function startTypingPhase() {
+
+    appPhase = 'typing-loading';
+
+    const rhythmAudio =
+        document.getElementById('naqqali-audio');
+
+    rhythmAudio.pause();
+
+    document
+        .getElementById('ending-screen')
+        .classList.remove('climax-active');
+
+    document.getElementById('game-wrapper').style.display = 'none';
+
+    const bg = document.getElementById('bg-canvas');
+
+    bg.style.opacity = "0.08";
+    bg.style.filter = "grayscale(70%) blur(2px)";
+    bg.style.transform = "scale(1)";
+
+    const typingScreen =
+        document.getElementById('typing-screen');
+
+    typingScreen.classList.add('active');
+
+    typingData = [...DEFAULT_TYPING_DATA];
+
+    initTypingKeyboard();
+    resetTypingStats();
+
+    typingStageIndex = 0;
+
+    appPhase = 'typing';
+
+    loadTypingStage();
+}
+
+/* =========================================================
+   통계
+========================================================= */
+
+function resetTypingStats() {
+    clearInterval(typingTimer);
+
+    typingStartTime = null;
+    typingTotalKeys = 0;
+    typingCorrectKeys = 0;
+
+    document.getElementById('typing-time').innerText = "0:00";
+    document.getElementById('typing-cpm').innerText = "0";
+    document.getElementById('typing-acc').innerText = "100%";
+}
+
+
+function startTypingTimer() {
+    if (typingStartTime) return;
+
+    typingStartTime = Date.now();
+
+    typingTimer = setInterval(() => {
+        const elapsed = (Date.now() - typingStartTime) / 1000;
+
+        const min = Math.floor(elapsed / 60);
+        const sec = Math.floor(elapsed % 60);
+
+        document.getElementById('typing-time').innerText =
+            `${min}:${String(sec).padStart(2,'0')}`;
+
+        const elapsedMin = elapsed / 60;
+
+        const cpm =
+            elapsedMin > 0
+                ? Math.floor(typingCorrectKeys / elapsedMin)
+                : 0;
+
+        document.getElementById('typing-cpm').innerText = cpm;
+
+    }, 1000);
+}
+
+
+function updateTypingStats() {
+    const acc =
+        typingTotalKeys > 0
+            ? Math.floor(
+                typingCorrectKeys /
+                typingTotalKeys *
+                100
+              )
+            : 100;
+
+    document.getElementById('typing-acc').innerText = `${acc}%`;
+}
+
+
+/* =========================================================
+   문장 로딩
+========================================================= */
+
+function loadTypingStage() {
+
+    if (typingStageIndex >= typingData.length) {
+        showTypingEnding();
+        return;
+    }
+
+    const data = typingData[typingStageIndex];
+
+    document.getElementById('typing-progress').innerText =
+        `${typingStageIndex + 1} / ${typingData.length}`;
+
+    document.querySelectorAll('.typing-key').forEach(el => {
+        el.classList.remove(
+            'target-led',
+            'error-led',
+            'pressed'
+        );
+    });
+
+
+    /* =========================================
+       감상 전용 행
+    ========================================= */
+
+    if (data.mode === 'show') {
+
+        typingTarget = [];
+        typingInput = [];
+
+        document.querySelector('.typing-stats').style.display = 'none';
+        document.getElementById('typing-keyboard').style.display = 'none';
+        document.querySelector('.typing-hands').style.display = 'none';
+
+        document.getElementById('typing-display').innerHTML = `
+            <div style="
+                color:#888;
+                font-size:.8rem;
+                letter-spacing:3px;
+                margin-bottom:18px;
+                text-align:center;
+            ">
+                TUMAR · READ
+            </div>
+
+            <div class="typing-target"
+                 style="
+                    color:#fff;
+                    text-align:center;
+                    font-size:2.7rem;
+                 ">
+                ${data.p}
+            </div>
+
+            <div style="
+                text-align:center;
+                color:#777;
+                margin-top:14px;
+                font-size:.85rem;
+            ">
+                다음 구절로 이어집니다
+            </div>
+        `;
+
+        document.getElementById('typing-translation').innerText =
+            data.k || "";
+
+        /* 5초 뒤 자동 진행 */
+        setTimeout(() => {
+            typingStageIndex++;
+            loadTypingStage();
+        }, 5000);
+
+        return;
+    }
+
+
+    /* =========================================
+       직접 타이핑 행
+    ========================================= */
+
+    document.querySelector('.typing-stats').style.display = 'flex';
+    document.getElementById('typing-keyboard').style.display = 'flex';
+    document.querySelector('.typing-hands').style.display = 'flex';
+
+    typingTarget = data.p.split('');
+    typingInput = [];
+
+    renderTypingStage();
+}
+
+/* =========================================================
+   UI 렌더
+========================================================= */
+
+function renderTypingStage() {
+    const data = typingData[typingStageIndex];
+
+    let inputHtml = "";
+
+    for (let i = 0; i < typingInput.length; i++) {
+        const char = typingInput[i];
+
+        if (
+            normalizeTypingPersian(char) ===
+            normalizeTypingPersian(typingTarget[i])
+        ) {
+            inputHtml +=
+                `<span class="typing-correct">${char}</span>`;
+        }
+        else {
+            inputHtml +=
+                `<span class="typing-wrong">${char}</span>`;
+        }
+    }
+
+    inputHtml += `<span class="typing-cursor"></span>`;
+
+    document.getElementById('typing-display').innerHTML = `
+        <div class="typing-target">
+            ${typingTarget.join('')}
+        </div>
+
+        <div class="typing-input">
+            ${inputHtml}
+        </div>
+    `;
+
+    document.getElementById('typing-translation').innerText =
+        data.k || "";
+
+    document.querySelectorAll('.typing-key').forEach(el => {
+        el.classList.remove('target-led', 'error-led');
+    });
+
+    const hasError = typingInput.some(
+        (c, i) =>
+            normalizeTypingPersian(c) !==
+            normalizeTypingPersian(typingTarget[i])
+    );
+
+    if (hasError) {
+        const back = document.getElementById('typing-Backspace');
+
+        if (back) back.classList.add('error-led');
+
+        updateTypingFinger('Backspace');
+        return;
+    }
+
+    if (typingInput.length === typingTarget.length) {
+        const enter = document.getElementById('typing-Enter');
+
+        if (enter) enter.classList.add('target-led');
+
+        updateTypingFinger('Enter');
+        return;
+    }
+
+    updateTypingLed(typingTarget[typingInput.length]);
+}
+
+
+/* =========================================================
+   문자 정규화
+========================================================= */
+
+function normalizeTypingPersian(char) {
+    if (!char) return char;
+
+    if (char === 'ي') return 'ی';
+    if (char === 'ك') return 'ک';
+
+    const enToFa = {
+        '0':'۰','1':'۱','2':'۲','3':'۳','4':'۴',
+        '5':'۵','6':'۶','7':'۷','8':'۸','9':'۹'
+    };
+
+    const arToFa = {
+        '٠':'۰','١':'۱','٢':'۲','٣':'۳','٤':'۴',
+        '٥':'۵','٦':'۶','٧':'۷','٨':'۸','٩':'۹'
+    };
+
+    return enToFa[char] || arToFa[char] || char;
+}
+
+
+/* =========================================================
+   LED / 손가락
+========================================================= */
+
+function clearTypingGuides() {
+    document.querySelectorAll('.typing-key').forEach(el => {
+        el.classList.remove('target-led', 'error-led');
+    });
+
+    document.querySelectorAll('.typing-finger').forEach(el => {
+        el.classList.remove('active');
+    });
+}
+
+
+function updateTypingFinger(keyId) {
+    document.querySelectorAll('.typing-finger').forEach(el => {
+        el.classList.remove('active');
+    });
+
+    if (keyId === 'Enter' || keyId === 'Backspace') {
+        document.getElementById('tf-r-pinky')?.classList.add('active');
+        return;
+    }
+
+    const keyEl =
+        document.getElementById(`typing-${keyId}`);
+
+    if (!keyEl) return;
+
+    const zone =
+        [...keyEl.classList]
+            .find(c => c.startsWith('zone-'));
+
+    if (!zone) return;
+
+    if (zone === 'zone-space') {
+        document.getElementById('tf-space-l')?.classList.add('active');
+        document.getElementById('tf-space-r')?.classList.add('active');
+        return;
+    }
+
+    const fingerId =
+        'tf-' + zone.replace('zone-', '');
+
+    document.getElementById(fingerId)?.classList.add('active');
+}
+
+
+function updateTypingLed(targetChar) {
+    clearTypingGuides();
+
+    if (!targetChar) return;
+
+    const keyId = typingCharToKey[targetChar];
+
+    if (!keyId) return;
+
+    const el =
+        document.getElementById(`typing-${keyId}`);
+
+    if (!el) return;
+
+    el.classList.add('target-led');
+
+    updateTypingFinger(keyId);
+
+    if (typingShiftMap[targetChar]) {
+        const zone =
+            [...el.classList]
+                .find(c => c.startsWith('zone-'));
+
+        if (zone?.includes('-r-')) {
+            document
+                .getElementById('typing-ShiftLeft')
+                ?.classList.add('target-led');
+
+            document
+                .getElementById('tf-l-pinky')
+                ?.classList.add('active');
+        }
+        else if (zone?.includes('-l-')) {
+            document
+                .getElementById('typing-ShiftRight')
+                ?.classList.add('target-led');
+
+            document
+                .getElementById('tf-r-pinky')
+                ?.classList.add('active');
+        }
+    }
+}
+
+
+/* =========================================================
+   타자 입력
+========================================================= */
+
+function handleTypingKeyDown(e) {
+
+const currentData = typingData[typingStageIndex];
+
+if (!currentData || currentData.mode !== 'type') {
+    return;
+}
+
+    if (
+        e.code === 'Space' ||
+        e.code === 'Backspace' ||
+        e.code === 'Enter'
+    ) {
+        e.preventDefault();
+    }
+
+    const keyEl =
+        document.getElementById(`typing-${e.code}`);
+
+    if (keyEl) {
+        keyEl.classList.add('pressed');
+
+        if (
+            e.key !== 'Shift' &&
+            e.key !== 'Control' &&
+            e.key !== 'Alt' &&
+            e.key !== 'Meta'
+        ) {
+            setTimeout(
+                () => keyEl.classList.remove('pressed'),
+                100
+            );
+        }
+    }
+
+    if (
+        (e.code === 'ShiftLeft' ||
+         e.code === 'ShiftRight') &&
+        !typingShiftDown
+    ) {
+        typingShiftDown = true;
+
+        typingKbLayout.forEach(row =>
+            row.forEach(k => {
+                if (!k.s) return;
+
+                const char =
+                    document.querySelector(
+                        `#typing-${k.id} .p-char`
+                    );
+
+                if (char) char.innerText = k.s;
+            })
+        );
+    }
+
+    if (
+        e.key === 'Shift' ||
+        e.key === 'Alt' ||
+        e.key === 'Control' ||
+        e.key === 'Meta' ||
+        e.key === 'Tab' ||
+        e.key === 'CapsLock'
+    ) {
+        return;
+    }
+
+    startTypingTimer();
+
+
+    /* Backspace */
+
+    if (e.code === 'Backspace') {
+        if (typingInput.length > 0) {
+            typingInput.pop();
+        }
+
+        renderTypingStage();
+        return;
+    }
+
+
+    /* Enter → 다음 문장 */
+
+    if (e.code === 'Enter') {
+
+        if (typingInput.length !== typingTarget.length) {
+            typingTotalKeys++;
+            updateTypingStats();
+            return;
+        }
+
+        const hasError = typingInput.some(
+            (c, i) =>
+                normalizeTypingPersian(c) !==
+                normalizeTypingPersian(typingTarget[i])
+        );
+
+        if (hasError) {
+            return;
+        }
+
+        typingStageIndex++;
+
+        setTimeout(loadTypingStage, 180);
+        return;
+    }
+
+
+    /* 실제 문자 입력 */
+
+    if (typingInput.length >= typingTarget.length) {
+        return;
+    }
+
+    typingTotalKeys++;
+
+    const expected =
+        normalizeTypingPersian(
+            typingTarget[typingInput.length]
+        );
+
+    const input =
+        normalizeTypingPersian(e.key);
+
+    const expectedKey =
+        typingCharToKey[expected];
+
+    const requiresShift =
+        typingShiftMap[expected];
+
+    let match = false;
+
+    if (input === expected) {
+        match = true;
+    }
+    else if (
+        expectedKey &&
+        e.code === expectedKey
+    ) {
+        if (requiresShift && e.shiftKey) match = true;
+        if (!requiresShift && !e.shiftKey) match = true;
+    }
+
+    if (match) {
+        typingCorrectKeys++;
+
+        typingInput.push(
+            typingTarget[typingInput.length]
+        );
+    }
+    else {
+        typingInput.push(e.key);
+    }
+
+    updateTypingStats();
+    renderTypingStage();
+}
+
+
+function handleTypingKeyUp(e) {
+    const keyEl =
+        document.getElementById(`typing-${e.code}`);
+
+    if (
+        keyEl &&
+        (
+            e.key === 'Shift' ||
+            e.key === 'Control' ||
+            e.key === 'Alt' ||
+            e.key === 'Meta'
+        )
+    ) {
+        keyEl.classList.remove('pressed');
+    }
+
+    if (
+        e.code === 'ShiftLeft' ||
+        e.code === 'ShiftRight'
+    ) {
+        typingShiftDown = false;
+
+        typingKbLayout.forEach(row =>
+            row.forEach(k => {
+                if (!k.s) return;
+
+                const char =
+                    document.querySelector(
+                        `#typing-${k.id} .p-char`
+                    );
+
+                if (char) char.innerText = k.p;
+            })
+        );
+    }
+}
+
+
+/* =========================================================
+   최종 엔딩
+========================================================= */
+
+function showTypingEnding() {
+    clearInterval(typingTimer);
+
+    appPhase = 'final';
+
+    document
+        .getElementById('typing-screen')
+        .classList.remove('active');
+
+    const time =
+        document.getElementById('typing-time').innerText;
+
+    const cpm =
+        document.getElementById('typing-cpm').innerText;
+
+    const acc =
+        document.getElementById('typing-acc').innerText;
+
+    document.getElementById('typing-final-stats').innerHTML =
+        `완주 ${typingData.length}행 · ${time} · ${cpm} 타/분 · 정확도 ${acc}`;
+
+    const ending =
+        document.getElementById('typing-ending-screen');
+
+    ending.style.display = 'flex';
+
+    requestAnimationFrame(() => {
+        ending.classList.add('active');
+    });
+}
+
+	function startGame() {
+            appPhase = 'rhythm';
+    	    initAudio();
+            document.getElementById('start-modal').style.display = 'none';
+            isRunning = true;
+            gameStartTime = performance.now();
+
+            lyrics.forEach((lineData, lineIdx) => {
+const lineBaseTime =
+    lineIdx * LINE_DELAY + FIRST_HIT_OFFSET;
+
+                METER_PATTERN.forEach((type, sylIdx) => {
+                    const hitTime = lineBaseTime + METER_INTERVALS[sylIdx];
+                    activeNotes.push({
+                        lineIndex: lineIdx,
+                        sylIndex: sylIdx,
+                        type: type,
+                        hitTime: hitTime,
+                        endTime: hitTime + (type === 1 ? LONG_DURATION : 0),
+                        holding: false,
+                        holdStartTime: 0,
+                        hit: false,
+                        missed: false,
+                        element: null
+                    });
+                });
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* 상단 텍스트 패널 렌더링 */
+        function updateTextPanel(lineIdx) {
+            if (currentDisplayedLine === lineIdx) return;
+            currentDisplayedLine = lineIdx;
+
+            const data = lyrics[lineIdx];
+            document.getElementById('line-counter').innerText = 
+            document.getElementById('line-counter').innerText =
+    		`원문 ${lineIdx + 3}행 / 10 · 연행 ${lineIdx + 1} / ${lyrics.length}`;
+
+            // 페르시아어 단어 연철 유지
+            const pContainer = document.getElementById('persian-container');
+            pContainer.innerHTML = '';
+            data.words.forEach((word, wIdx) => {
+                const span = document.createElement('span');
+                span.className = 'persian-word';
+                span.id = `p-word-${wIdx}`;
+                span.innerText = word;
+                pContainer.appendChild(span);
+            });
+
+            // 4음보 한글 발음 토막 및 운율 기호
+            const phonContainer = document.getElementById('phonetic-container');
+            phonContainer.innerHTML = '';
+            let globalSylCounter = 0;
+    data.phon_feet.forEach((foot, footIdx) => {
+    const footDiv = document.createElement('div');
+
+    footDiv.className = 'foot-block';
+    footDiv.id = `foot-${footIdx}`;
+                foot.forEach(syl => {
+                    const span = document.createElement('span');
+                    span.className = 'phon-syl';
+                    span.id = `phon-syl-${globalSylCounter}`;
+                    span.innerHTML = `${syl}<span class="meter-mark">${METER_SYMBOLS[globalSylCounter]}</span>`;
+                    footDiv.appendChild(span);
+                    globalSylCounter++;
+                });
+                phonContainer.appendChild(footDiv);
+            });
+
+            document.getElementById('display-korean').innerText = data.k;
+        }
+
+function updateRhythmPhase(lineIdx, elapsedTime) {
+
+    const lineElapsed =
+        elapsedTime - (lineIdx * LINE_DELAY);
+
+    const wrapper =
+        document.getElementById('game-wrapper');
+
+    const label =
+        document.getElementById('rhythm-mode-label');
+
+
+    if (lineElapsed < READ_PREVIEW_MS) {
+
+        rhythmSubPhase = 'reading';
+
+        wrapper.classList.add('reading');
+        wrapper.classList.remove('performing');
+
+        label.innerText = 'READ · 원문과 의미를 먼저 읽으십시오';
+
+        document.getElementById('foot-text').innerText = '–';
+
+    } else {
+
+        rhythmSubPhase = 'performing';
+
+        wrapper.classList.remove('reading');
+        wrapper.classList.add('performing');
+
+        label.innerText = 'PERFORM · 이제 운율을 연행하십시오';
+    }
+}
+
+function getFootIndex(sylIdx) {
+
+    if (sylIdx <= 2) return 0;
+    if (sylIdx <= 5) return 1;
+    if (sylIdx <= 8) return 2;
+
+    return 3;
+}
+
+
+function highlightSyllable(sylIdx, status) {
+
+    const footIdx = getFootIndex(sylIdx);
+
+    const foot =
+        document.getElementById(`foot-${footIdx}`);
+
+    if (!foot) return;
+
+
+    document.getElementById('foot-text').innerText =
+        footIdx + 1;
+
+
+    if (status === 'active') {
+
+        document
+            .querySelectorAll('.foot-block')
+            .forEach(el => el.classList.remove('active-foot'));
+
+        foot.classList.add('active-foot');
+    }
+
+
+    if (status === 'hit') {
+
+        /* 한 음보의 마지막 음절까지 끝났을 때 */
+        if ([2, 5, 8, 10].includes(sylIdx)) {
+
+            foot.classList.remove('active-foot');
+            foot.classList.add('foot-hit');
+        }
+    }
+
+
+    if (status === 'miss') {
+
+        if ([2, 5, 8, 10].includes(sylIdx)) {
+            foot.classList.remove('active-foot');
+        }
+    }
+}
+
+        /* Miss 플로팅 텍스트 팝업 함수 */
+        function triggerMissPopup() {
+            const targetEl = document.getElementById('hit-target');
+            targetEl.classList.add('miss-pulse');
+            setTimeout(() => targetEl.classList.remove('miss-pulse'), 120);
+
+            const missEl = document.createElement('div');
+            missEl.className = 'miss-indicator';
+            missEl.innerText = 'Miss';
+            document.getElementById('stage-area').appendChild(missEl);
+
+            setTimeout(() => {
+                if (missEl) missEl.remove();
+            }, 450);
+        }
+
+        /* -------------------------------------------------------------
+           4. 메인 루프 (자동 성공 보정 및 노드 폐기)
+        ------------------------------------------------------------- */
+        function gameLoop(currentTime) {
+            if (!isRunning) return;
+            const elapsedTime = currentTime - gameStartTime;
+            const railWidth = window.innerWidth;
+
+            const currentLineIdx = Math.min(Math.floor(elapsedTime / LINE_DELAY), lyrics.length - 1);
+            if (lyrics[currentLineIdx]) {
+                updateTextPanel(currentLineIdx);
+            }
+	updateRhythmPhase(currentLineIdx, elapsedTime);
+
+            activeNotes.forEach(note => {
+                if (note.hit || note.missed) return;
+
+                const timeDiff = note.hitTime - elapsedTime;
+                const noteX = TARGET_X + (timeDiff * NOTE_SPEED);
+
+                if (note.lineIndex === currentLineIdx && Math.abs(timeDiff) <= 120 && !note.holding) {
+                    highlightSyllable(note.sylIndex, 'active');
+                }
+
+if (
+    rhythmSubPhase === 'performing' &&
+    noteX < railWidth &&
+    !note.element
+) {
+                    const el = document.createElement('div');
+                    el.className = `note ${note.type === 0 ? 'note-short' : 'note-long'}`;
+                    document.getElementById('note-track').appendChild(el);
+                    note.element = el;
+                }
+
+                if (note.element) {
+                    note.element.style.transform = `translateX(${noteX}px)`;
+
+                    // [장음 완화: 꼬리가 판정선을 통과하면 자동 성공 판정]
+                    if (note.type === 1 && note.holding) {
+                        if (elapsedTime >= note.endTime - 60) {
+                            note.holding = false;
+                            note.hit = true;
+                            currentHoldingNote = null;
+                            document.getElementById('hit-target').classList.remove('holding');
+                            triggerPanelPulse();
+                            highlightSyllable(note.sylIndex, 'hit');
+                            if (note.element) {
+                                note.element.remove();
+                                note.element = null;
+                            }
+                            handleResult(true);
+                        }
+                    }
+
+                    // 미타격 상태로 지나친 음표 즉시 삭제 및 Miss 팝업
+                    if (!note.holding && timeDiff < -140) {
+                        note.missed = true;
+                        highlightSyllable(note.sylIndex, 'miss');
+                        triggerMissPopup();
+                        if (note.element) {
+                            note.element.remove();
+                            note.element = null;
+                        }
+                        handleResult(false);
+                    }
+                }
+            });
+
+            if (processedNotes >= totalNotesCount) {
+                endGame();
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* -------------------------------------------------------------
+           5. 타건 판정 (빈 공간 난사 삭감 및 롱노트 유지 판정)
+        ------------------------------------------------------------- */
+function handleKeyDown() {
+    if (!isRunning) return;
+    if (rhythmSubPhase === 'reading') return;
+
+    const elapsedTime = performance.now() - gameStartTime;
+
+    // 이미 장음을 누르고 있으면 추가 입력 무시
+    if (currentHoldingNote) return;
+
+    const targetEl = document.getElementById('hit-target');
+
+    targetEl.classList.add('pulsing');
+
+    setTimeout(() => {
+        targetEl.classList.remove('pulsing');
+    }, 70);
+
+
+    // 판정 범위 안의 음표 탐색
+    const candidate = activeNotes.find(
+        n =>
+            !n.hit &&
+            !n.missed &&
+            Math.abs(n.hitTime - elapsedTime) <= 140
+    );
+
+
+    if (candidate) {
+
+        /* 단음 */
+        if (candidate.type === 0) {
+
+            candidate.hit = true;
+
+            playTaikoSound(false);
+
+            triggerPanelPulse();
+            highlightSyllable(candidate.sylIndex, 'hit');
+
+            if (candidate.element) {
+                candidate.element.remove();
+                candidate.element = null;
+            }
+
+            handleResult(true);
+        }
+
+
+        /* 장음 */
+        else if (candidate.type === 1) {
+
+            candidate.holding = true;
+            candidate.holdStartTime = elapsedTime;
+
+            currentHoldingNote = candidate;
+
+            targetEl.classList.add('holding');
+
+            if (candidate.element) {
+                candidate.element.classList.add('holding-active');
+            }
+
+            /* 장음도 누르는 순간 소리 */
+            playTaikoSound(true);
+        }
+
+    } else {
+
+        /* 빈 공간 타건은 감점하지 않고 시각 효과만 */
+        targetEl.classList.add('miss-pulse');
+
+        setTimeout(() => {
+            targetEl.classList.remove('miss-pulse');
+        }, 100);
+    }
+}
+
+        function handleKeyUp() {
+            if (!isRunning) return;
+            const elapsedTime = performance.now() - gameStartTime;
+
+            if (currentHoldingNote) {
+                const note = currentHoldingNote;
+                document.getElementById('hit-target').classList.remove('holding');
+
+                const holdDuration = elapsedTime - note.holdStartTime;
+
+                // [장음 판정 대폭 완화]: 최소 220ms 이상 누르고 있었다면 릴리즈 성공으로 인정
+                if (holdDuration >= MIN_HOLD_REQUIRED || elapsedTime >= note.endTime - 140) {
+                    note.holding = false;
+                    note.hit = true;
+                    currentHoldingNote = null;
+                    triggerPanelPulse();
+                    highlightSyllable(note.sylIndex, 'hit');
+                    if (note.element) {
+                        note.element.remove();
+                        note.element = null;
+                    }
+                    handleResult(true);
+                } else {
+                    // 220ms 미만으로 너무 일찍 뗀 경우만 Miss
+                    note.holding = false;
+                    note.missed = true;
+                    currentHoldingNote = null;
+                    highlightSyllable(note.sylIndex, 'miss');
+                    triggerMissPopup();
+                    if (note.element) {
+                        note.element.remove();
+                        note.element = null;
+                    }
+                    handleResult(false);
+                }
+            }
+        }
+
+function handleResult(isSuccess) {
+
+    if (isSuccess) {
+
+        processedNotes++;
+        combo++;
+
+    } else {
+
+        combo = 0;
+        missCount++;
+
+        if (processedNotes < totalNotesCount) {
+            processedNotes++;
+        }
+    }
+
+
+    currentAccuracy = Math.max(
+        0,
+        Math.round(
+            ((totalNotesCount - missCount) /
+             totalNotesCount) * 100
+        )
+    );
+
+
+    document.getElementById('acc-text').innerText =
+        `${currentAccuracy}%`;
+
+    document.getElementById('gauge-bar').style.width =
+        `${currentAccuracy}%`;
+
+
+    /* 더 이상 실패 경고 상태로 만들지 않음 */
+    document
+        .getElementById('danger-vignette')
+        .classList.remove('active');
+
+    document
+        .getElementById('gauge-bar')
+        .classList.remove('danger');
+
+    document
+        .getElementById('acc-text')
+        .classList.remove('danger-text');
+}
+
+        function triggerPanelPulse() {
+            const p = document.getElementById('text-panel');
+            p.classList.remove('pulse');
+            void p.offsetWidth;
+            p.classList.add('pulse');
+        }
+
+window.addEventListener('keydown', (e) => {
+
+    /* 시작 화면 */
+    if (appPhase === 'intro') {
+        if (e.code === 'Enter' && !e.repeat) {
+            startGame();
+        }
+        return;
+    }
+
+
+    /* PHASE I : 리듬게임 */
+    if (appPhase === 'rhythm') {
+
+        if (e.repeat) return;
+
+        if (
+            e.code === 'Space' ||
+            e.code === 'KeyD' ||
+            e.code === 'KeyK'
+        ) {
+            handleKeyDown();
+        }
+
+        return;
+    }
+
+
+    /* PHASE II : 페르시아어 타이핑 */
+    if (appPhase === 'typing') {
+        handleTypingKeyDown(e);
+        return;
+    }
+
+});
+
+
+window.addEventListener('keyup', (e) => {
+
+    /* 리듬게임 */
+    if (appPhase === 'rhythm') {
+
+        if (
+            e.code === 'Space' ||
+            e.code === 'KeyD' ||
+            e.code === 'KeyK'
+        ) {
+            handleKeyUp();
+        }
+
+        return;
+    }
+
+
+    /* 타이핑 */
+    if (appPhase === 'typing') {
+        handleTypingKeyUp(e);
+    }
+
+});
+
+        /* -------------------------------------------------------------
+           6. 엔딩 연출 (80% 기준 판정)
+        ------------------------------------------------------------- */
+        function endGame() {
+            isRunning = false;
+	    appPhase = 'ending';
+            const endingScreen = document.getElementById('ending-screen');
+            const bgCanvas = document.getElementById('bg-canvas');
+            const endingTitle = document.getElementById('ending-title');
+            const endingDesc = document.getElementById('ending-desc');
+
+            endingScreen.classList.add('climax-active');
+
+            if (currentAccuracy >= 80) {
+                bgCanvas.style.opacity = "1.0";
+                bgCanvas.style.filter = "grayscale(0%) blur(0px)";
+                bgCanvas.style.transform = "scale(1.08)";
+
+                endingTitle.innerText = "비극의 물질적 폭발 (80% 수호 성공)";
+                endingDesc.innerHTML = `최종 진실 수호율 <strong>${currentAccuracy}%</strong>.<br>` +
+                    "정교한 운율의 타건이 텍스트의 선형적 인과율을 찢어냈습니다. " +
+                    "한 캔버스 위에 가해와 구원의 도상이 공존하는 세밀화의 '공간적 병치'가 열리고, " +
+                    "나껄의 거친 절규와 가슴을 치는 애도(라틈)가 하나의 제의로 폭발합니다.";
+
+                const audio = document.getElementById('naqqali-audio');
+                audio.currentTime = 0;
+                audio.play().catch(() => console.log("Audio blocked"));
+            } else {
+                endingTitle.innerText = "하마르티아의 지속 (80% 붕괴)";
+                endingTitle.style.textShadow = "none";
+                endingTitle.style.color = "#888";
+                endingDesc.innerHTML = `최종 수호율 <strong>${currentAccuracy}%</strong> (80% 기준선 미달).<br>` +
+                    "운율의 호흡이 끊어지며 로스탐의 단검은 빗나가지 못했고, 징표는 어둠 속에 묻혔습니다. " +
+                    "서사는 새로운 매체로 승화되지 못한 채 침묵하는 활자 속에 박제됩니다.";
+            }
+        }
+    </script>
+</body>
+</html>
