@@ -33,15 +33,6 @@
             z-index: 1;
         }
 
-        /* 80% 미만 위험 경고 비넷 */
-        #danger-vignette {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            box-shadow: inset 0 0 100px rgba(224, 36, 36, 0.6);
-            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
-            z-index: 5;
-        }
-        #danger-vignette.active { opacity: 1; }
-
         #game-wrapper {
             position: relative; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: space-between;
@@ -212,13 +203,6 @@
             background: linear-gradient(90deg, #2ecc71, var(--gold));
             transition: width 0.2s ease-out, background 0.3s;
         }
-        #gauge-bar.danger {
-            background: linear-gradient(90deg, #900, var(--danger-red));
-        }
-        #gauge-target-line {
-            position: absolute; left: 80%; top: 0; width: 3px; height: 100%;
-            background: #fff; box-shadow: 0 0 10px #fff; z-index: 10;
-        }
 
         .hud-stats {
             display: flex; justify-content: space-between; width: 700px; max-width: 90%;
@@ -244,9 +228,28 @@
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             opacity: 0; transition: all 1s ease;
         }
-        #ending-screen.climax-active {
-            background: rgba(80, 0, 0, 0.8); opacity: 1; pointer-events: auto;
-        }
+#ending-screen.climax-active {
+    background: rgba(7, 7, 9, 0.88);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.climax-title {
+    font-size: 2.8rem;
+    font-weight: 900;
+    color: var(--gold-bright);
+    text-shadow:
+        0 0 30px rgba(245, 200, 66, 0.35);
+    margin-bottom: 16px;
+}
+
+.climax-desc {
+    font-size: 1.2rem;
+    max-width: 700px;
+    text-align: center;
+    line-height: 1.7;
+    color: #ddd;
+}
         .climax-title {
             font-size: 2.8rem; font-weight: 900; color: #fff; text-shadow: 0 0 30px #ff0000;
             margin-bottom: 16px;
@@ -717,22 +720,10 @@
     box-shadow: 0 0 10px rgba(245,200,66,.5);
 }
 
-/* 퀴즈 완료 후 세밀화 전체 공개 */
-#quiz-screen.reveal-complete #quiz-miniature {
-    opacity: 1;
-    filter: grayscale(0%) blur(0);
-}
-
 #quiz-miniature {
     transition:
         opacity 1.2s ease,
         filter 1.2s ease;
-}
-
-#quiz-screen.reveal-complete .quiz-panel {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .8s ease;
 }
 
 /* ===== 리듬게임 : 읽기 → 연행 단계 ===== */
@@ -803,7 +794,6 @@
 
     <audio id="naqqali-audio" src="naqqali.m4a"></audio>
     <div id="bg-canvas"></div>
-    <div id="danger-vignette"></div>
 
     <!-- 시작 안내 모달 -->
 <!-- =====================================================
@@ -1332,20 +1322,19 @@ function answerQuiz(index, button) {
         .classList.add('restored');
 
 
-    /* 배경 세밀화가 점점 드러남 */
-    const reveal =
-        0.08 + ((quizIndex + 1) / QUIZ_DATA.length) * 0.72;
+/* 배경 세밀화가 점점 드러남
+   마지막 문제까지 맞혀도 완전 공개하지 않음 */
+const reveal =
+    0.08 + ((quizIndex + 1) / QUIZ_DATA.length) * 0.72;
 
-    const miniature = document.getElementById('quiz-miniature');
+const miniature =
+    document.getElementById('quiz-miniature');
 
-    miniature.style.opacity = reveal;
-
-    if (quizIndex === QUIZ_DATA.length - 1) {
-        miniature.style.filter = 'grayscale(0%)';
-    }
+miniature.style.opacity = reveal;
 
 
-const next = document.getElementById('quiz-next');
+const next =
+    document.getElementById('quiz-next');
 
 
 /* 마지막 문제까지 복원 완료 */
@@ -1353,10 +1342,14 @@ if (quizIndex === QUIZ_DATA.length - 1) {
 
     next.style.display = 'none';
 
-    /* 정답 해설을 잠깐 읽을 시간 */
+    feedback.innerHTML =
+        `<strong>서사의 조각이 모두 복원되었습니다.</strong><br>` +
+        `이제 복원된 서사의 운율을 직접 연행합니다.`;
+
+    /* 3초 뒤 리듬게임 시작 화면으로 이동 */
     setTimeout(() => {
-        revealCompletedMiniature();
-    }, 1800);
+        finishQuizPrologue();
+    }, 3000);
 
 } else {
 
@@ -1383,30 +1376,6 @@ function nextQuiz() {
     renderQuiz();
 }
 
-function revealCompletedMiniature() {
-
-    const screen =
-        document.getElementById('quiz-screen');
-
-    const miniature =
-        document.getElementById('quiz-miniature');
-
-
-    /* 세밀화 완전 복원 */
-    screen.classList.add('reveal-complete');
-
-    miniature.style.opacity = '1';
-    miniature.style.filter = 'grayscale(0%) blur(0px)';
-
-
-    /* 3초간 감상 */
-    setTimeout(() => {
-
-        finishQuizPrologue();
-
-    }, 4000);
-}
-
 function finishQuizPrologue() {
 
     appPhase = 'intro';
@@ -1415,7 +1384,7 @@ function finishQuizPrologue() {
         document.getElementById('quiz-screen');
 
 
-    /* 복원된 세밀화에서 천천히 암전 */
+    /* 퀴즈 화면을 천천히 암전 */
     screen.style.transition = 'opacity 1.2s ease';
     screen.style.opacity = '0';
 
@@ -2634,6 +2603,8 @@ function handleResult(isSuccess) {
     }
 
 
+    /* 성공/실패 판정이 아니라
+       단순한 운율 동기화 수치만 계산 */
     currentAccuracy = Math.max(
         0,
         Math.round(
@@ -2643,25 +2614,15 @@ function handleResult(isSuccess) {
     );
 
 
-    document.getElementById('acc-text').innerText =
-        `${currentAccuracy}%`;
-
-    document.getElementById('gauge-bar').style.width =
-        `${currentAccuracy}%`;
-
-
-    /* 더 이상 실패 경고 상태로 만들지 않음 */
     document
-        .getElementById('danger-vignette')
-        .classList.remove('active');
+        .getElementById('acc-text')
+        .innerText =
+        `${currentAccuracy}%`;
 
     document
         .getElementById('gauge-bar')
-        .classList.remove('danger');
-
-    document
-        .getElementById('acc-text')
-        .classList.remove('danger-text');
+        .style.width =
+        `${currentAccuracy}%`;
 }
 
         function triggerPanelPulse() {
@@ -2732,42 +2693,85 @@ window.addEventListener('keyup', (e) => {
 
 });
 
-        /* -------------------------------------------------------------
-           6. 엔딩 연출 (80% 기준 판정)
-        ------------------------------------------------------------- */
-        function endGame() {
-            isRunning = false;
-	    appPhase = 'ending';
-            const endingScreen = document.getElementById('ending-screen');
-            const bgCanvas = document.getElementById('bg-canvas');
-            const endingTitle = document.getElementById('ending-title');
-            const endingDesc = document.getElementById('ending-desc');
+/* -------------------------------------------------------------
+   6. 리듬게임 종료 → 세밀화 공개 → 공통 결과 화면
+------------------------------------------------------------- */
+function endGame() {
 
-            endingScreen.classList.add('climax-active');
+    isRunning = false;
+    appPhase = 'ending';
 
-            if (currentAccuracy >= 80) {
-                bgCanvas.style.opacity = "1.0";
-                bgCanvas.style.filter = "grayscale(0%) blur(0px)";
-                bgCanvas.style.transform = "scale(1.08)";
+    const gameWrapper =
+        document.getElementById('game-wrapper');
 
-                endingTitle.innerText = "비극의 물질적 폭발 (80% 수호 성공)";
-                endingDesc.innerHTML = `최종 진실 수호율 <strong>${currentAccuracy}%</strong>.<br>` +
-                    "정교한 운율의 타건이 텍스트의 선형적 인과율을 찢어냈습니다. " +
-                    "한 캔버스 위에 가해와 구원의 도상이 공존하는 세밀화의 '공간적 병치'가 열리고, " +
-                    "나껄의 거친 절규와 가슴을 치는 애도(라틈)가 하나의 제의로 폭발합니다.";
+    const endingScreen =
+        document.getElementById('ending-screen');
 
-                const audio = document.getElementById('naqqali-audio');
-                audio.currentTime = 0;
-                audio.play().catch(() => console.log("Audio blocked"));
-            } else {
-                endingTitle.innerText = "하마르티아의 지속 (80% 붕괴)";
-                endingTitle.style.textShadow = "none";
-                endingTitle.style.color = "#888";
-                endingDesc.innerHTML = `최종 수호율 <strong>${currentAccuracy}%</strong> (80% 기준선 미달).<br>` +
-                    "운율의 호흡이 끊어지며 로스탐의 단검은 빗나가지 못했고, 징표는 어둠 속에 묻혔습니다. " +
-                    "서사는 새로운 매체로 승화되지 못한 채 침묵하는 활자 속에 박제됩니다.";
-            }
-        }
+    const bgCanvas =
+        document.getElementById('bg-canvas');
+
+    const endingTitle =
+        document.getElementById('ending-title');
+
+    const endingDesc =
+        document.getElementById('ending-desc');
+
+    const rhythmAudio =
+        document.getElementById('naqqali-audio');
+
+
+    /* 연행 종료 */
+    rhythmAudio.pause();
+
+
+    /* 리듬게임 UI를 천천히 사라지게 함 */
+    gameWrapper.style.transition =
+        'opacity .8s ease';
+
+    gameWrapper.style.opacity = '0';
+
+
+    /* 결과 화면은 아직 띄우지 않음 */
+    endingScreen.classList.remove(
+        'climax-active'
+    );
+
+
+    /* 세밀화를 처음으로 완전히 공개 */
+    bgCanvas.style.opacity = '1';
+
+    bgCanvas.style.filter =
+        'grayscale(0%) blur(0px)';
+
+    bgCanvas.style.transform =
+        'scale(1)';
+
+
+    /* fade가 끝난 뒤 리듬 UI 완전 제거 */
+    setTimeout(() => {
+
+        gameWrapper.style.display = 'none';
+
+    }, 800);
+
+
+    /* 세밀화를 5초간 감상 */
+    setTimeout(() => {
+
+        endingTitle.innerText =
+            '이미지에서 다시 목소리로';
+
+        endingDesc.innerHTML =
+            `운율 동기화율 <strong>${currentAccuracy}%</strong>.<br><br>` +
+            `몸으로 연행한 서사는 이제 세밀화의 장면으로 남았습니다.<br>` +
+            `이제 그 서사는 나깔리의 목소리와 투머르의 문자로 다시 이어집니다.`;
+
+        endingScreen.classList.add(
+            'climax-active'
+        );
+
+    }, 5000);
+}
     </script>
 </body>
 </html>
